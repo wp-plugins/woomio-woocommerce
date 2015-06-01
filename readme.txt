@@ -1,6 +1,6 @@
-﻿=== Woomio ===
+﻿=== Woomio WooCommerce ===
 Contributors: Woomio Team
-Tags: woomio,social media,share buys
+Tags: woomio woocommerce,woocommerce,social media,share buys
 Requires at least: 3.0.1
 Tested up to: 3.4
 Stable tag: 4.3License: GPLv2 or laterLicense 
