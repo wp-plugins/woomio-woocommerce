@@ -86,9 +86,11 @@ if (!class_exists("Woomio_Woocommerce"))
             $this->installDB();
             $Response = $this->registerSite();
             
-            $ConfigFile = fopen(plugin_dir_path(__FILE__) . 'config.xml', 'w');
+            /*$ConfigFile = fopen(plugin_dir_path(__FILE__) . 'config.xml', 'w');
             fwrite($ConfigFile, str_replace('"', '', $Response));
-            fclose($ConfigFile);
+            fclose($ConfigFile);*/
+
+            update_option('woomio_rid', $Response);
         }
 
 
@@ -106,22 +108,25 @@ if (!class_exists("Woomio_Woocommerce"))
             }
 
             if (get_option('woomio_allow_js')=='on') {
-            
-                add_action('wp_print_scripts','myscript');
-                function myscript() {
-                
-                    if ($WOOMIO_WOOCOMMERCE_RID == 0)
-                    {
-                        $WOOMIO_WOOCOMMERCE_RID = file_get_contents(plugin_dir_path(__FILE__) . 'config.xml', 'w');
-                    }
-                    
-                    ?>
-                    <script type="text/javascript" src="https://woomio.com/assets/js/analytics/r.js" id="wa" data-r="<?=$WOOMIO_WOOCOMMERCE_RID?>"></script>
-                    <?php
-                }
+                add_action('wp_print_scripts', array($this, 'add_woomio_script'));
             }
 
             add_action('woocommerce_thankyou', array($this, 'registerOrder'));
+        }
+
+        function add_woomio_script()
+        {
+            if(!isset($WOOMIO_WOOCOMMERCE_RID)) {
+                $WOOMIO_WOOCOMMERCE_RID = 0;
+            }
+            if ($WOOMIO_WOOCOMMERCE_RID == 0) {
+                //$WOOMIO_WOOCOMMERCE_RID = file_get_contents(plugin_dir_path(__FILE__) . 'config.xml', 'w');
+                $WOOMIO_WOOCOMMERCE_RID = get_option('woomio_rid');
+            }
+                    
+            ?>
+            <script type="text/javascript" src="https://woomio.com/assets/js/analytics/r.js" id="wa" data-r="<?=$WOOMIO_WOOCOMMERCE_RID?>"></script>
+            <?php
         }
 
 
@@ -172,23 +177,48 @@ if (!class_exists("Woomio_Woocommerce"))
                 ),
 				array('%d','%d')
             );
-			
-            $registerHitUrl = self::WOOMIO_WOOCOMMERCE_API . 'api/analyticsr/RegisterHit?esid=%s&url=%s&r=1&ct=&ur=';
-            $esid = urlencode($wacsid);
-            $paymentUrl = urlencode($order->get_checkout_payment_url(false));
-            $registerHitCallBack = sprintf($registerHitUrl,$esid,$paymentUrl);
-            file_get_contents($registerHitCallBack);
 
-
-            $url = self::WOOMIO_WOOCOMMERCE_API . 'umbraco/api/Endpoints/purchase?sid=%s&oid=%s&ot=%s&url=0&oc=%s&email=%s';
+            //The following should be optimized instead of building a URL and then splitting it up again.
+            //$url = self::WOOMIO_WOOCOMMERCE_API . 'umbraco/api/Endpoints/purchase?sid=%s&oid=%s&ot=%s&url=0&oc=%s&email=%s';
             $sid = urlencode($wacsid);
             $oid = urlencode($order_id);
             $ot = urlencode($order->get_total());
             $oc = urlencode($order->get_order_currency());
             $email = urlencode($order->billing_email);
-            $callBack = sprintf($url, $sid, $oid, $ot, $oc, $email);
+            //$callBack = sprintf($url, $sid, $oid, $ot, $oc, $email);
 
-            return @file_get_contents($callBack);
+            $url = "https://www.woomio.com/endpoints/purchase?sid=" . $sid . "&oid=" . $oid . "&ot=" . $ot . "&url=0&oc=" . $oc . "&email=" . $email;
+
+            $parts = parse_url($callBack);
+
+            $host = $parts['host'];
+
+            $path = $parts['path'];
+            if($parts['query'] != "") {
+                $path .= "?" . $parts['query'];
+            }
+
+            $file_pointer = fsockopen("ssl://" . $host, 443, $errno, $errstr, 10);
+
+            if(!$file_pointer) {
+                error_log("Error opening socket to woomio server: " . $errstr .  "(" . $errno . ").", 0);
+            }
+            else {
+                $out = "GET " . $path . " HTTP/1.1\r\n";
+                $out .= "Host: " . $host . "\r\n";
+                $out .= "Content-Type: application/x-www-form-urlencoded\r\n";
+                $out .= "Content-Length: " . strlen("") . "\r\n";
+                $out .= "Connection: Close\r\n\r\n";
+                $fwrite = fwrite($file_pointer, $out);
+                stream_set_timeout($file_pointer, 2);
+
+                if($fwrite === false) {
+                    error_log("Error sending request to woomio server: Error writing to socket.", 0);
+                }
+                fclose($file_pointer);
+            }
+
+            return true;
         }
 
 
