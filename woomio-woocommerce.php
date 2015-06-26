@@ -32,6 +32,10 @@ if (!class_exists("Woomio_Woocommerce"))
 
         var $settings, $options_page;
 
+        public static function w_error_handler($errno, $errstr, $errfile, $errline, $errcontext) {
+            error_log('An error occurred communication with woomio servers, and was bypassed. ' . $errno . ': ' . $errstr);
+            return true;
+        }
 
         function __construct()
         {
@@ -85,11 +89,6 @@ if (!class_exists("Woomio_Woocommerce"))
         {
             $this->installDB();
             $Response = $this->registerSite();
-            
-            /*$ConfigFile = fopen(plugin_dir_path(__FILE__) . 'config.xml', 'w');
-            fwrite($ConfigFile, str_replace('"', '', $Response));
-            fclose($ConfigFile);*/
-
             update_option('woomio_rid', $Response);
         }
 
@@ -120,7 +119,6 @@ if (!class_exists("Woomio_Woocommerce"))
                 $WOOMIO_WOOCOMMERCE_RID = 0;
             }
             if ($WOOMIO_WOOCOMMERCE_RID == 0) {
-                //$WOOMIO_WOOCOMMERCE_RID = file_get_contents(plugin_dir_path(__FILE__) . 'config.xml', 'w');
                 $WOOMIO_WOOCOMMERCE_RID = get_option('woomio_rid');
             }
                     
@@ -158,14 +156,28 @@ if (!class_exists("Woomio_Woocommerce"))
             $email = urlencode(get_bloginfo('admin_email'));
             $callBack = sprintf($url, $name, $domain, $lang, $email);
 
-            return @file_get_contents($callBack);
+            //Ignore errors returned by the server
+            $context = stream_context_create(array(
+                'http' => array('ignore_errors' => true)
+            ));
+
+            set_error_handler(array('Woomio_Woocommerce', 'w_error_handler'));
+            $Response = @file_get_contents($callBack, false, $context);
+            restore_error_handler();
+
+            return $Response;
         }
 
 
         function registerOrder($order_id)
         {
             $order = new WC_Order($order_id);
-            $wacsid = (int) @$_COOKIE['wacsid'];
+            $wacsid = $_COOKIE['wacsid'];
+
+            //We do not log purchases that are not affiliates
+            if(!$wacsid) {
+                return true;
+            }
 
             global $wpdb;
 
@@ -179,17 +191,29 @@ if (!class_exists("Woomio_Woocommerce"))
             );
 
             //The following should be optimized instead of building a URL and then splitting it up again.
-            //$url = self::WOOMIO_WOOCOMMERCE_API . 'umbraco/api/Endpoints/purchase?sid=%s&oid=%s&ot=%s&url=0&oc=%s&email=%s';
             $sid = urlencode($wacsid);
             $oid = urlencode($order_id);
             $ot = urlencode($order->get_total());
             $oc = urlencode($order->get_order_currency());
             $email = urlencode($order->billing_email);
-            //$callBack = sprintf($url, $sid, $oid, $ot, $oc, $email);
+            $url = urlencode($_SERVER['SERVER_NAME']);
 
-            $url = "https://www.woomio.com/endpoints/purchase?sid=" . $sid . "&oid=" . $oid . "&ot=" . $ot . "&url=0&oc=" . $oc . "&email=" . $email;
+            $purchase_url = "https://www.woomio.com/endpoints/purchase?sid=" . $sid . "&oid=" . $oid . "&ot=" . $ot . "&oc=" . $oc . "&email=" . $email . "&url=" . $url;
 
-            $parts = parse_url($callBack);
+            //Ignore errors returned by the server
+            $context = stream_context_create(array(
+                'http' => array(
+                    'ignore_errors' => true,
+                    'timeout' => 10 //seconds
+                )
+            ));
+
+            set_error_handler(array('Woomio_Woocommerce', 'w_error_handler'));
+            @file_get_contents($purchase_url, false, $context);
+            restore_error_handler();
+
+            //TODO: Figure out how to make fsockopen stable, since it is a faster connection.
+            /*$parts = parse_url($purchase_url);
 
             $host = $parts['host'];
 
@@ -198,7 +222,9 @@ if (!class_exists("Woomio_Woocommerce"))
                 $path .= "?" . $parts['query'];
             }
 
+            set_error_handler(array('Woomio_Woocommerce', 'w_error_handler'));
             $file_pointer = fsockopen("ssl://" . $host, 443, $errno, $errstr, 10);
+            restore_error_handler();
 
             if(!$file_pointer) {
                 error_log("Error opening socket to woomio server: " . $errstr .  "(" . $errno . ").", 0);
@@ -206,8 +232,6 @@ if (!class_exists("Woomio_Woocommerce"))
             else {
                 $out = "GET " . $path . " HTTP/1.1\r\n";
                 $out .= "Host: " . $host . "\r\n";
-                $out .= "Content-Type: application/x-www-form-urlencoded\r\n";
-                $out .= "Content-Length: " . strlen("") . "\r\n";
                 $out .= "Connection: Close\r\n\r\n";
                 $fwrite = fwrite($file_pointer, $out);
                 stream_set_timeout($file_pointer, 2);
@@ -216,7 +240,7 @@ if (!class_exists("Woomio_Woocommerce"))
                     error_log("Error sending request to woomio server: Error writing to socket.", 0);
                 }
                 fclose($file_pointer);
-            }
+            }*/
 
             return true;
         }
