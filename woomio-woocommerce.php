@@ -323,12 +323,23 @@ if (!class_exists("Woomio_Woocommerce"))
                                 'created_at_min' => date('Y-m-d H:i:s', strtotime('now -' . $_hrs . ' hours')),
                                 'created_at_max' => date('Y-m-d H:i:s', strtotime('now'))
                             );
-                            $data = $api->get_orders(null, $filter, null, -1);
+                            
+                            // Get all orders:
+                            // WooCommerce only allows paged order lookups, hence the do/while approach                            
+                            $i = 1;
+                            $data = null;
+                            $orders = array();
+                            do {
+                                $data = $api->get_orders(null, $filter, null, $i);
+                                $orders = array_merge($orders, $data['orders']);
+                                $i++;
+                            } while ($data['orders'] != null);
 
-                            if ($data instanceof WP_Error) {
+                            // Display all orders
+                            if ($orders instanceof WP_Error) {
                                 // No need to handle errors as we will just send an empty list
                             } else {
-                                foreach ($data['orders'] as $order) {
+                                foreach ($orders as $order) {
                                     $oid = $order['id'];
                                     $map = $wpdb->get_row('SELECT * FROM ' . $woomioTable . ' WHERE orderid = ' . $oid);
 
@@ -361,12 +372,22 @@ if (!class_exists("Woomio_Woocommerce"))
                                 $response['customers'][] = $data['customer'];
                             }
                         } else {
-                            $data = $api->get_customers(null, array(), -1);
+                            // Get all customers:
+                            // WooCommerce only allows paged customer lookups, hence the do/while approach                            
+                            $i = 1;
+                            $data = null;
+                            $customers = array();
+                            do {
+                                $data = $api->get_customers(null, array(), $i);
+                                $customers = array_merge($customers, $data['customers']);
+                                $i++;
+                            } while ($data['customers'] != null);
 
-                            if ($data instanceof WP_Error) {
+                            // Display all orders
+                            if ($customers instanceof WP_Error) {
                                 // No need to handle errors as we will just send an empty list
-                            } else if ($data['customers']) {
-                                foreach ($data['customers'] as $customer) {
+                            } else if ($customers) {
+                                foreach ($customers as $customer) {
                                     $response['customers'][] = $customer;
                                 }
                             }
@@ -395,12 +416,22 @@ if (!class_exists("Woomio_Woocommerce"))
                                 $filter['created_at_max'] = date('Y-m-d H:i:s', strtotime('now'));
                             }
 
-                            $data = $api->get_products(null, null, $filter, -1);
+                            // Get all products:
+                            // WooCommerce only allows paged product lookups, hence the do/while approach                            
+                            $i = 1;
+                            $data = null;
+                            $products = array();
+                            do {
+                                $data = $api->get_products(null, null, $filter, $i);
+                                $products = array_merge($products, $data['products']);
+                                $i++;
+                            } while ($data['products'] != null);
 
-                            if ($data instanceof WP_Error) {
+                            // Display all products
+                            if ($products instanceof WP_Error) {
                                 // No need to handle errors as we will just send an empty list
-                            } else if ($data['products']) {
-                                foreach ($data['products'] as $product) {
+                            } else if ($products) {
+                                foreach ($products as $product) {
                                     $response['products'][] = $product;
                                 }
                             }
