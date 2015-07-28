@@ -1,4 +1,4 @@
-=== Woomio For Shops ===
+﻿=== Woomio for Shops ===
 Contributors: Woomio Team
 Tags: woomio woocommerce,woocommerce,social media,share buys
 Requires at least: 3.0.1
