@@ -3,51 +3,45 @@
 	Plugin Name: Woomio Woocommerce
 	Plugin URI: https://woomio.com
 	Description: Woomio Integration into WooCommerce made easy
-	Version: 1.1
+	Version: 1.1.4
 	Author: Woomio.com
 	Author URI: https://woomio.com
 */
 
-
-if (!defined('ABSPATH') || !function_exists('is_admin'))
-{
+if (!defined('ABSPATH') || !function_exists('is_admin')) {
 	header('Status: 403 Forbidden');
 	header('HTTP/1.1 403 Forbidden');
 	exit();
 }
 
-
-if (!class_exists("Woomio_Woocommerce"))
-{
-	class Woomio_Woocommerce
-    {
-        const WOOMIO_WOOCOMMERCE_VERSION = '1.1';
+if (!class_exists("Woomio_Woocommerce")) {
+	class Woomio_Woocommerce {
+        const WOOMIO_WOOCOMMERCE_VERSION = '1.1.4';
         const WOOMIO_WOOCOMMERCE_RELEASE = '1430431200';
         const WOOMIO_WOOCOMMERCE_URL = 'https://www.woomio.com';
         const WOOMIO_WOOCOMMERCE_LINK = 'Woomio.com';
 
         const WOOMIO_WOOCOMMERCE_ACCESS = 'ping.woomio.com';
         const WOOMIO_WOOCOMMERCE_API = 'https://www.woomio.com/';        
-        var $WOOMIO_WOOCOMMERCE_RID = 0;
+        
+        public $WOOMIO_WOOCOMMERCE_RID = 0;
 
-        var $settings, $options_page;
+        public $settings;
+        public $options_page;
 
         public static function w_error_handler($errno, $errstr, $errfile, $errline, $errcontext) {
             error_log('An error occurred communication with woomio servers, and was bypassed. ' . $errno . ': ' . $errstr);
             return true;
         }
 
-        function __construct()
-        {
+        function __construct() {
             if (is_admin()) {
                 if (!class_exists("Woomio_Woocommerce_Settings")) {
                     require_once plugin_dir_path(__FILE__) . 'woomio-woocommerce-settings.php';
                 }
-
                 $this->settings = new Woomio_Woocommerce_Settings();
-            } else {
-
             }
+
             add_action('init', array($this, 'init'));
 
             register_activation_hook(__FILE__, array($this, 'activate'));
@@ -55,18 +49,15 @@ if (!class_exists("Woomio_Woocommerce"))
         }
 
 
-        function activate($networkwide)
-        {
+        function activate($networkwide) {
             $this->network_propagate(array($this, '_activate'), $networkwide);
         }
 
-        function deactivate($networkwide)
-        {
+        function deactivate($networkwide) {
             $this->network_propagate(array($this, '_deactivate'), $networkwide);
         }
 
-        function network_propagate($pfunction, $networkwide)
-        {
+        function network_propagate($pfunction, $networkwide) {
             global $wpdb;
 
             if (function_exists('is_multisite') && is_multisite()) {
@@ -85,21 +76,18 @@ if (!class_exists("Woomio_Woocommerce"))
         }
 
 
-        function _activate()
-        {
+        function _activate() {
             $this->installDB();
             $Response = $this->registerSite();
             update_option('woomio_rid', $Response);
         }
 
 
-        function _deactivate()
-        {
+        function _deactivate() {
         }
 
 
-        function init()
-        {
+        function init() {
             load_plugin_textdomain('woomio_woocommerce', plugin_dir_path(__FILE__) . 'lang', basename(dirname(__FILE__)) . '/lang');
 
             if (isset($_GET['woomio']) && in_array($_GET['woomio'], array('orders', 'customers', 'products'))) {
@@ -113,8 +101,7 @@ if (!class_exists("Woomio_Woocommerce"))
             add_action('woocommerce_thankyou', array($this, 'registerOrder'));
         }
 
-        function add_woomio_script()
-        {
+        function add_woomio_script() {
             if(!isset($WOOMIO_WOOCOMMERCE_RID)) {
                 $WOOMIO_WOOCOMMERCE_RID = 0;
             }
@@ -122,14 +109,13 @@ if (!class_exists("Woomio_Woocommerce"))
                 $WOOMIO_WOOCOMMERCE_RID = get_option('woomio_rid');
             }
                     
-            ?>
-            <script type="text/javascript" src="https://woomio.com/assets/js/analytics/r.js" id="wa" data-r="<?=$WOOMIO_WOOCOMMERCE_RID?>"></script>
-            <?php
+?>
+<script type="text/javascript" src="https://woomio.com/assets/js/analytics/r.js" id="wa" data-r="<?=$WOOMIO_WOOCOMMERCE_RID?>" data-v="<?=self::WOOMIO_WOOCOMMERCE_VERSION?>"></script>
+<?php
         }
 
 
-        function installDB()
-        {
+        function installDB() {
             global $wpdb;
 
             $table_name = $wpdb->prefix . 'woomio_woocommerce';
@@ -147,8 +133,7 @@ if (!class_exists("Woomio_Woocommerce"))
         }
 
 
-        function registerSite()
-        {
+        function registerSite() {
             $url = self::WOOMIO_WOOCOMMERCE_API . 'umbraco/api/Endpoints/RetailerSignup?name=%s&domain=%s&country=%s&email=%s&platform=3';
             $name = urlencode(get_bloginfo('name'));
             $domain = urlencode(get_bloginfo('url'));
@@ -169,10 +154,12 @@ if (!class_exists("Woomio_Woocommerce"))
         }
 
 
-        function registerOrder($order_id)
-        {
+        function registerOrder($order_id) {
             $order = new WC_Order($order_id);
-            $wacsid = $_COOKIE['wacsid'];
+            $wacsid = null;
+            if(isset($_COOKIE['wacsid'])) {
+                $wacsid = $_COOKIE['wacsid'];
+            }
 
             //We do not log purchases that are not affiliates
             if(!$wacsid) {
@@ -193,7 +180,7 @@ if (!class_exists("Woomio_Woocommerce"))
             //The following should be optimized instead of building a URL and then splitting it up again.
             $sid = urlencode($wacsid);
             $oid = urlencode($order_id);
-            $ot = urlencode($order->get_total());
+            $ot = urlencode($order->get_subtotal());
             $oc = urlencode($order->get_order_currency());
             $email = urlencode($order->billing_email);
             $url = urlencode($_SERVER['SERVER_NAME']);
@@ -245,218 +232,555 @@ if (!class_exists("Woomio_Woocommerce"))
             return true;
         }
 
+        // {base_url}/?woomio=orders&hrs=all&affiliated=false
+        function getData($type) {
+            $AllowedIP = gethostbyname(self::WOOMIO_WOOCOMMERCE_ACCESS);
+            
+            $response = new stdClass();
+            $response->platform = 'woocommerce';
 
-        function getData($type, $debug = 0)
-        {
-            $AllowedIP  = gethostbyname(self::WOOMIO_WOOCOMMERCE_ACCESS);
-            $woodir     = plugin_dir_path(__FILE__) . '../woocommerce/includes/api/';
-            $response   = array(
-				'platform' => 'woocommerce',
-                'status' => 'error',
-                'status_message' => 'IP NOT allowed'
-            );
-
-            // Test for WooCommerce
-            if (!file_exists($woodir . 'class-wc-api-server.php'))
-            {
-                $response['status'] = 'error';
-                $response['status_message'] = 'WooCommerce is NOT installed';
+            if(in_array('woocommerce/woocommerce.php', apply_filters('active_plugins', get_option( 'active_plugins' ))) === false) {
+                return;
             }
-            else if ($_SERVER['REMOTE_ADDR'] == $AllowedIP || $debug)
-            {
-                require_once $woodir . 'interface-wc-api-handler.php';
-                require_once $woodir . 'class-wc-api-exception.php';
-                require_once $woodir . 'class-wc-api-server.php';
-                require_once $woodir . 'class-wc-api-resource.php';
-                require_once $woodir . 'class-wc-api-authentication.php';
-                require_once $woodir . 'class-wc-api-json-handler.php';
-                require_once $woodir . 'class-wc-api-orders.php';
-                require_once $woodir . 'class-wc-api-customers.php';
-                require_once $woodir . 'class-wc-api-products.php';
 
-                global $wp, $wpdb;
+            if ($_SERVER['REMOTE_ADDR'] !== $AllowedIP) {
+                return;
+            }
 
-                // Settings
-                $woomioTable = $wpdb->prefix . 'woomio_woocommerce';
-                $server = new WC_API_Server($wp->query_vars['wc-api-route']);
+            $hrs = ((isset($_GET['hrs']) && is_numeric($_GET['hrs'])) ? $_GET['hrs'] : null);
+            $affiliated = (isset($_GET['affiliated']) && $_GET['affiliated'] === 'true');
+            $id = (isset($_GET['id']) ? $_GET['id'] : 0);
 
-                // Authenticate WC api request as first known admin
-                add_filter('woocommerce_api_check_authentication', function () {
-                    $admins = get_users('role=administrator&number=1'); // find an admin, any admin
-                    return $admins[0];
-                });
-                $server->check_authentication();
+            switch ($type) {
+                case 'orders':
+                    $response->orders = $this->get_orders($affiliated, $id, $hrs);
+                    break;
+                case 'customers':
+                    $response->customers = $this->get_customers($id);
+                    break;
+                case 'products':
+                    $response->products = $this->get_products($id);
+                    break;
+            }
 
-                // Set default response
-                $response['status'] = 'success';
-                $response['status_message'] = 'IP allowed';
+            echo json_encode($response);
+            die;
+        }
 
-                // Params
-                $_hrs = (int)(isset($_GET['hrs']) && $_GET['hrs'] ? $_GET['hrs'] : 1);
-                $_wacsid = (int)(isset($_GET['wacsid']) && $_GET['wacsid'] ? $_GET['wacsid'] : 0);
-                $_id = (int)(isset($_GET['id']) && $_GET['id'] ? $_GET['id'] : 0);
-                $_debug = (bool)(isset($_GET['debug']) && $_GET['debug'] ? $_GET['debug'] : $debug);
+        function get_orders($affiliated, $id, $hrs) {
+            global $wpdb;
 
-                switch ($type)
-				{
-                    case 'orders':
-                        $response['orders'] = array();
+            //If no orders return empty order array
+            $orders = array();
+            
+            $table_order_items = $wpdb->prefix . "woocommerce_order_items";
+            $table_order_itemmeta = $wpdb->prefix . "woocommerce_order_itemmeta";
+            $table_posts = $wpdb->prefix . "posts";
+            $table_woomio = $wpdb->prefix . "woomio_woocommerce";
+            $now = new DateTime(null, new DateTimeZone('UTC'));
 
-                        $api = new WC_API_Orders($server);
+            $query = "SELECT DISTINCT " . $table_order_items . ".order_id, post_date_gmt, order_item_name, order_item_type, " . $table_order_items . ".order_item_id, meta_key, meta_value";
+            if($affiliated === true) {
+                $query .= ", wacsid";
+            }
+            $query .= " FROM " . $table_order_items . ", " . $table_order_itemmeta . ", " . $table_posts;
+            if($affiliated === true) {
+                $query .= ", " . $table_woomio;
+            }
+            $query .= " WHERE " . $table_order_itemmeta . ".order_item_id = " . $table_order_items . ".order_item_id AND " . $table_posts . ".ID = " . $table_order_items . ".order_id";
+            if($affiliated === true) {
+                $query .= " AND " . $table_order_items . ".order_id IN (SELECT orderid AS order_id FROM " . $table_woomio . ")";
+            }
+            if($id) {
+                $query .= " AND " . $table_order_items . ".order_id=%d";
+            }
+            if($hrs !== null) {
+                $now->sub(new DateInterval('PT' . $hrs . 'H'));
+                $query .= " AND post_date_gmt >= '%s'";
+            }
+            $query .= " ORDER BY order_id;";
 
-                        if ($_id) {
-                            $data = $api->get_order($_id);
+            if ($id && $hrs !== null) {
+                $query = $wpdb->prepare($query, $id, $now->format('Y-m-d H:i:s'));
+            }
+            else if($id) {
+                $query = $wpdb->prepare($query, $id);
+            }
+            else if($hrs !== null) {
+                $query = $wpdb->prepare($query, $now->format('Y-m-d H:i:s'));
+            }
+            
+            $order_set = $wpdb->get_results($query);
 
-                            if ($data instanceof WP_Error) {
-                                // No need to handle errors as we will just send an empty list
-                            } else if ($data['order']) {
-                                $oid = $data['order']['id'];
-                                $map = $wpdb->get_row('SELECT * FROM ' . $woomioTable . ' WHERE orderid = ' . $oid);
+            //Woocommerce separates shipping and items giving them same order id
+            //Scan rows and separate into items and shipping
+            $current_order_id = null;
+            $order_count = 0;
+            foreach ($order_set as $order_row) {
+                if($order_row->order_id !== $current_order_id) {
+                    //New order
+                    $orders[$order_count] = new stdClass();
+                    $orders[$order_count]->id = $order_row->order_id;
+                    $orders[$order_count]->time = $order_row->post_date_gmt;
+                    $orders[$order_count]->items = array();
+                    $orders[$order_count]->shippings = array();
+                    $current_order_id = $order_row->order_id;
+                    $order_count++;
 
-                                $response['orders'][$oid] = $data['order'];
-                                $response['orders'][$oid]['wacsid'] = ($map && $map->wacsid ? $map->wacsid : 0);
-                            }
-                        } else {
-                            $response['orders'] = array();
+                    $current_order_item_id = null;
+                    $order_items_count = 0;
+                    $order_shippings_count = 0;
+                }
+                if($order_row->order_item_id !== $current_order_item_id) {
+                    //New item or shipping within same order
+                    if($order_row->order_item_type === 'line_item') {
+                        $orders[$order_count - 1]->items[$order_items_count] = new stdClass();
+                        $orders[$order_count - 1]->items[$order_items_count]->name = $order_row->order_item_name;
+                        $order_items_count++;
+                    }
+                    if($order_row->order_item_type === 'shipping') {
+                        $orders[$order_count - 1]->shippings[$order_shippings_count] = new stdClass();
+                        $orders[$order_count - 1]->shippings[$order_shippings_count]->shipping_type = $order_row->order_item_name;
+                        $order_shippings_count++;
+                    }
+                    $current_order_item_id = $order_row->order_item_id;
+                }
+                
+                if($order_row->order_item_type === 'line_item') {
+                    $this->process_order_item_row($orders[$order_count - 1]->items[$order_items_count - 1], $order_row);
+                }
+                if($order_row->order_item_type === 'shipping') {
+                    $this->process_order_shipping_row($orders[$order_count - 1]->shippings[$order_shippings_count - 1], $order_row);
+                }
+                
+            }
+            unset($order);
 
-                            $filter = array(
-                                'created_at_min' => date('Y-m-d H:i:s', strtotime('now -' . $_hrs . ' hours')),
-                                'created_at_max' => date('Y-m-d H:i:s', strtotime('now'))
-                            );
-                            
-                            // Get all orders:
-                            // WooCommerce only allows paged order lookups, hence the do/while approach                            
-                            $i = 1;
-                            $data = null;
-                            $orders = array();
-                            do {
-                                $data = $api->get_orders(null, $filter, null, $i);
-                                $orders = array_merge($orders, $data['orders']);
-                                $i++;
-                            } while ($data['orders'] != null);
+            $table_posts = $wpdb->prefix . "posts";
+            $table_postmeta = $wpdb->prefix . "postmeta";
+            $now = new DateTime(null, new DateTimeZone('UTC'));
+            $query = "SELECT ID, post_date_gmt, meta_key, meta_value";
+            $query .= " FROM " . $table_posts . ", " . $table_postmeta;
+            $query .= " WHERE post_id = ID AND post_type='shop_order'";
+            if($id) {
+                $query .= " AND " . $table_posts . ".ID=%d";
+            }
+            if($hrs !== null) {
+                $now->sub(new DateInterval('PT' . $hrs . 'H'));
+                $query .= " AND post_date_gmt >= '%s'";
+            }
+            $query .= " ORDER BY ID;";
 
-                            // Display all orders
-                            if ($orders instanceof WP_Error) {
-                                // No need to handle errors as we will just send an empty list
-                            } else {
-                                foreach ($orders as $order) {
-                                    $oid = $order['id'];
-                                    $map = $wpdb->get_row('SELECT * FROM ' . $woomioTable . ' WHERE orderid = ' . $oid);
+            if ($id && $hrs !== null) {
+                $query = $wpdb->prepare($query, $id, $now->format('Y-m-d H:i:s'));
+            }
+            else if($id) {
+                $query = $wpdb->prepare($query, $id);
+            }
+            else if($hrs !== null) {
+                $query = $wpdb->prepare($query, $now->format('Y-m-d H:i:s'));
+            }
+            
+            $order_set = $wpdb->get_results($query);
 
-                                    if ($_wacsid) {
-                                        if ($map && $map->wacsid) {
-                                            $response['orders'][$oid] = $order;
-                                            $response['orders'][$oid]['wacsid'] = $map->wacsid;
-                                        }
-                                    } else {
-                                        $response['orders'][$oid] = $order;
-                                        $response['orders'][$oid]['wacsid'] = ($map && $map->wacsid ? $map->wacsid : 0);
-                                    }
-                                }
-                            }
+            $current_order_id = null;
+            $order_count = -1;
+            foreach ($order_set as $order_row) {
+                if($order_row->ID !== $current_order_id) {
+                    $order_count++;
+                    $current_order_id = $order_row->ID;
+                }
+                $this->process_order_post_meta_row($orders[$order_count], $order_row);
+            }
+            unset($order_row);
+
+            return $orders;
+        }
+
+        function process_order_item_row(&$order_item, $row) {
+            switch($row->meta_key) {
+                case '_qty':
+                    $order_item->quantity = $row->meta_value;
+                    break;
+                case '_tax_class':
+                    $order_item->tax_class = $row->meta_value;
+                    break;
+                case '_product_id':
+                    $order_item->product_id = $row->meta_value;
+                    break;
+                case '_variation_id':
+                    $order_item->variation_id = $row->meta_value;
+                    break;
+                case '_line_subtotal':
+                    $order_item->subtotal = $row->meta_value;
+                    break;
+                case '_line_total':
+                    $order_item->total = $row->meta_value;
+                    break;
+                case '_line_subtotal_tax':
+                    $order_item->subtotal = $row->meta_value;
+                    break;
+                case '_line_tax':
+                    $order_item->tax = $row->meta_value;
+                    break;
+            }
+        }
+
+        function process_order_shipping_row(&$order_item, $row) {
+            switch($row->meta_key) {
+                case 'method_id':
+                    $order_item->shipping_method = $row->meta_value;
+                    break;
+            }
+        }
+
+        function process_order_post_meta_row(&$order_item, $row) {
+            switch($row->meta_key) {
+                case '_order_currency':
+                    $order_item->currency = $row->meta_value;
+                    break;
+                case '_customer_ip_address':
+                    $order_item->customer_order_ip = $row->meta_value;
+                    break;
+                case '_customer_user_agent':
+                    $order_item->customer_user_agent = $row->meta_value;
+                    break;
+                case '_customer_user':
+                    if($row->meta_value == 0) {
+                        $order_item->guest_order = true;
+                        $order_item->customer_id = 0;
+                    }
+                    else {
+                        $order_item->guest_order = false;
+                        $order_item->customer_id = $row->meta_value;
+                    }
+                    break;
+                case '_order_shipping':
+                    $order_item->shippings[0]->shipping_cost = $row->meta_value;
+                    break;
+                case '_billing_country':
+                    $order_item->billing_country = $row->meta_value;
+                    break;
+                case '_billing_first_name':
+                    $order_item->billing_first_name = $row->meta_value;
+                    break;
+                case '_billing_last_name':
+                    $order_item->billing_last_name = $row->meta_value;
+                    break;
+                case '_billing_company':
+                    $order_item->billing_company = $row->meta_value;
+                    break;
+                case 'billing_address_1':
+                case 'billing_address_2':
+                    if(isset($order_item->billing_address) === false) {
+                        $order_item->billing_address = $row->meta_value;
+                    }
+                    else {
+                        $order_item->billing_address .= " " . $row->meta_value;
+                    }
+                    break;
+                case '_billing_city':
+                    $order_item->billing_city = $row->meta_value;
+                    break;
+                case '_billing_state':
+                    $order_item->billing_state = $row->meta_value;
+                    break;
+                case '_billing_postcode':
+                    $order_item->billing_postcode = $row->meta_value;
+                    break;
+                case '_billing_email':
+                    $order_item->customer_email = $row->meta_value;
+                    break;
+                case '_billing_phone':
+                    $order_item->customer_phone = $row->meta_value;
+                    break;
+                case '_shipping_country':
+                    $order_item->shippings[0]->shipping_country = $row->meta_value;
+                    break;
+                case '_shipping_first_name':
+                    $order_item->shippings[0]->shipping_first_name = $row->meta_value;
+                    break;
+                case '_shipping_last_name':
+                    $order_item->shippings[0]->shipping_last_name = $row->meta_value;
+                    break;
+                case '_shipping_company':
+                    $order_item->shippings[0]->shipping_company = $row->meta_value;
+                    break;
+                case 'shipping_address_1':
+                case 'shipping_address_2':
+                    if(isset($order_item->shippings[0]->shipping_address) === false) {
+                        $order_item->shippings[0]->shipping_address = $row->meta_value;
+                    }
+                    else {
+                        $order_item->shippings[0]->shipping_address .= " " . $row->meta_value;
+                    }
+                    break;
+                case '_shipping_city':
+                    $order_item->shippings[0]->shipping_city = $row->meta_value;
+                    break;
+                case '_shipping_state':
+                    $order_item->shippings[0]->shipping_state = $row->meta_value;
+                    break;
+                case '_shipping_postcode':
+                    $order_item->shippings[0]->shipping_postcode = $row->meta_value;
+                    break;
+                case '_payment_method':
+                    $order_item->payment_method = $row->meta_value;
+                    break;
+                case '_cart_discount':
+                    $order_item->cart_discount = $row->meta_value;
+                    break;
+                case '_cart_discount_tax':
+                    $order_item->cart_discount_tax = $row->meta_value;
+                    break;
+                case '_order_tax':
+                    $order_item->order_tax = $row->meta_value;
+                    break;
+                case 'order_shipping_tax':
+                    $order_item->shippings[0]->shipping_tax = $row->meta_value;
+                    break;
+                case 'order_total':
+                    $order_item->total = $row->value;
+                    break;
+            }
+        }
+
+        function get_customers($id) {
+            global $wpdb;
+
+            $customers = array();
+
+            $table_users = $wpdb->prefix . 'users';
+            $table_usermeta = $wpdb->prefix . 'usermeta';
+
+            $query = "SELECT " . $table_users . ".ID, user_email, user_url, user_registered, meta_key, meta_value";
+            $query .= " FROM " . $table_users . ", " . $table_usermeta;
+            $query .= " WHERE " . $table_users . ".ID = " . $table_usermeta . ".user_id";
+            if($id) {
+                $query .= " AND " . $table_users . ".ID = %d";
+            }
+            $query .= " ORDER BY ID;";
+            if($id) {
+                $query = $wpdb->prepare($query, $id);
+            }
+
+            $user_set = $wpdb->get_results($query);
+
+            $current_user_id = null;
+            $customer_count = 0;
+            foreach($user_set as $user_row) {
+                if($user_row->ID !== $current_user_id) {
+                    $customers[$customer_count] = new stdClass();
+                    $customers[$customer_count]->id = $user_row->ID;
+                    $customers[$customer_count]->email = $user_row->user_email;
+                    $customers[$customer_count]->url = $user_row->user_url;
+                    $customers[$customer_count]->registration_time = $user_row->user_registered;
+                    $customer_count++;
+                    $current_user_id = $user_row->ID;
+                }
+                switch($user_row->meta_key) {
+                    case 'nickname':
+                        $customers[$customer_count - 1]->nickname = $user_row->meta_value;
+                        break;
+                    case 'first_name':
+                        $customers[$customer_count - 1]->first_name = $user_row->meta_value;
+                        break;
+                    case 'last_name':
+                        $customers[$customer_count - 1]->last_name = $user_row->meta_value;
+                        break;
+                    case 'billing_country':
+                        $customers[$customer_count - 1]->billing_country = $user_row->meta_value;
+                        break;
+                    case 'billing_first_name':
+                        $customers[$customer_count - 1]->billing_first_name = $user_row->meta_value;
+                        break;
+                    case 'billing_last_name':
+                        $customers[$customer_count - 1]->billing_last_name = $user_row->meta_value;
+                        break;
+                    case 'billing_company':
+                        $customers[$customer_count - 1]->billing_company = $user_row->meta_value;
+                        break;
+                    case 'billing_address_1':
+                    case 'billing_address_2':
+                        if(isset($customers[$customer_count - 1]->billing_address) === false) {
+                            $customers[$customer_count - 1]->billing_address = $user_row->meta_value;
+                        }
+                        else {
+                            $customers[$customer_count - 1]->billing_address .= " " . $user_row->meta_value;
                         }
                         break;
-
-
-                    case 'customers':
-                        $response['orders'] = array();
-
-                        $api = new WC_API_Customers($server);
-
-                        if ($_id) {
-                            $data = $api->get_customer($_id);
-
-                            if ($data instanceof WP_Error) {
-                                // No need to handle errors as we will just send an empty list
-                            } else if ($data['customer']) {
-                                $response['customers'][] = $data['customer'];
-                            }
-                        } else {
-                            // Get all customers:
-                            // WooCommerce only allows paged customer lookups, hence the do/while approach                            
-                            $i = 1;
-                            $data = null;
-                            $customers = array();
-                            do {
-                                $data = $api->get_customers(null, array(), $i);
-                                $customers = array_merge($customers, $data['customers']);
-                                $i++;
-                            } while ($data['customers'] != null);
-
-                            // Display all orders
-                            if ($customers instanceof WP_Error) {
-                                // No need to handle errors as we will just send an empty list
-                            } else if ($customers) {
-                                foreach ($customers as $customer) {
-                                    $response['customers'][] = $customer;
-                                }
-                            }
+                    case 'billing_city':
+                        $customers[$customer_count - 1]->billing_city = $user_row->meta_value;
+                        break;
+                    case 'billing_state':
+                        $customers[$customer_count - 1]->billing_state = $user_row->meta_value;
+                        break;
+                    case 'billing_postcode':
+                        $customers[$customer_count - 1]->billing_postcode = $user_row->meta_value;
+                        break;
+                    case 'billing_email':
+                        $customers[$customer_count - 1]->billing_email = $user_row->meta_value;
+                        break;
+                    case 'billing_phone':
+                        $customers[$customer_count - 1]->billing_phone = $user_row->meta_value;
+                        break;
+                    case 'shipping_country':
+                        $customers[$customer_count - 1]->shipping_country = $user_row->meta_value;
+                        break;
+                    case 'shipping_first_name':
+                        $customers[$customer_count - 1]->shipping_first_name = $user_row->meta_value;
+                        break;
+                    case 'shipping_last_name':
+                        $customers[$customer_count - 1]->shipping_last_name = $user_row->meta_value;
+                        break;
+                    case 'shipping_company':
+                        $customers[$customer_count - 1]->shipping_company = $user_row->meta_value;
+                        break;
+                    case 'shipping_address_1':
+                    case 'shipping_address_2':
+                        if(isset($customers[$customer_count - 1]->shipping_address) === false) {
+                            $customers[$customer_count - 1]->shipping_address = $user_row->meta_value;
+                        }
+                        else {
+                            $customers[$customer_count - 1]->shipping_address .= " " . $user_row->meta_value;
                         }
                         break;
-
-
-                    case 'products':
-                        $response['products'] = array();
-
-                        $api = new WC_API_Products($server);
-
-                        if ($_id) {
-                            $data = $api->get_product($_id);
-
-                            if ($data instanceof WP_Error) {
-                                // No need to handle errors as we will just send an empty list
-                            } else if ($data['product']) {
-                                $response['products'][] = $data['product'];
-                            }
-                        } else {
-                            $filter = array();
-
-                            if ($_hrs != 'all') {
-                                $filter['created_at_min'] = date('Y-m-d H:i:s', strtotime('now -' . $_hrs . ' hours'));
-                                $filter['created_at_max'] = date('Y-m-d H:i:s', strtotime('now'));
-                            }
-
-                            // Get all products:
-                            // WooCommerce only allows paged product lookups, hence the do/while approach                            
-                            $i = 1;
-                            $data = null;
-                            $products = array();
-                            do {
-                                $data = $api->get_products(null, null, $filter, $i);
-                                $products = array_merge($products, $data['products']);
-                                $i++;
-                            } while ($data['products'] != null);
-
-                            // Display all products
-                            if ($products instanceof WP_Error) {
-                                // No need to handle errors as we will just send an empty list
-                            } else if ($products) {
-                                foreach ($products as $product) {
-                                    $response['products'][] = $product;
-                                }
-                            }
-                        }
-
+                    case 'shipping_city':
+                        $customers[$customer_count - 1]->shipping_city = $user_row->meta_value;
+                        break;
+                    case 'shipping_state':
+                        $customers[$customer_count - 1]->shipping_state = $user_row->meta_value;
+                        break;
+                    case 'shipping_postcode':
+                        $customers[$customer_count - 1]->shipping_postcode = $user_row->meta_value;
                         break;
                 }
             }
+            unset($user_row);
 
-            if (!headers_sent()) {
-                header("Content-type: text/plain; Charset=UTF-8");
+            return $customers;
+        }
+
+        function get_products($id) {
+            global $wpdb;
+
+            $products = array();
+
+            $table_posts = $wpdb->prefix . 'posts';
+            $table_postmeta = $wpdb->prefix . 'postmeta';
+            $query = "SELECT ID, post_date_gmt, post_content, post_title, post_excerpt, post_name, meta_key, meta_value";
+            $query .= " FROM " . $table_posts . ", " . $table_postmeta;
+            $query .= " WHERE post_type='product' AND " . $table_postmeta . ".post_id = " . $table_posts . ".ID";
+            if($id) {
+                $query .= " AND " . $table_posts . ".ID = %d";
+            }
+            $query .= " ORDER BY ID;";
+            if($id) {
+                $query = $wpdb->prepare($query, $id);
             }
 
-            if ($_debug) {
-                setCookie('wacsid', 999);
-                var_dump($response);
-                die();
-            } else {
-                echo json_encode($response);
-                die();
+            $product_set = $wpdb->get_results($query);
+
+            $current_product_id = null;
+            $current_product_sale_start = null;
+            $product_count = 0;
+            foreach($product_set as $product_row) {
+                if($product_row->ID !== $current_product_id) {
+                    $products[$product_count] = new stdClass();
+                    $products[$product_count]->id = $product_row->ID;
+                    $products[$product_count]->creation_date = $product_row->post_date_gmt;
+                    $products[$product_count]->description = $product_row->post_content;
+                    $products[$product_count]->title = $product_row->post_title;
+                    $products[$product_count]->short_description = $product_row->post_excerpt;
+                    $products[$product_count]->permalink = get_site_url() . "/index.php/product/" . $product_row->post_name;
+                    $products[$product_count]->currency = get_option('woocommerce_currency');
+                    $product_count++;
+                    $current_product_id = $product_row->ID;
+                }
+                switch($product_row->meta_key) {
+                    case '_visibility':
+                        $products[$product_count - 1]->visible = $product_row->meta_value;
+                        break;
+                    case '_stock_status':
+                        $products[$product_count - 1]->stock_status = $product_row->meta_value;
+                        break;
+                    case 'total_sales':
+                        $products[$product_count - 1]->stock_status = $product_row->meta_value;
+                        break;
+                    case '_downloadable':
+                        $products[$product_count - 1]->downloadable = $product_row->meta_value;
+                        break;
+                    case '_virtual':
+                        $products[$product_count - 1]->virtual = $product_row->meta_value;
+                        break;
+                    case '_regular_price':
+                        $products[$product_count - 1]->regular_price = $product_row->meta_value;
+                        break;
+                    case '_sale_price':
+                        $products[$product_count - 1]->sale_price = $product_row->meta_value;
+                        break;
+                    case '_featured':
+                        $products[$product_count - 1]->featured = $product_row->meta_value;
+                        break;
+                    case '_weight':
+                        $products[$product_count - 1]->weight = $product_row->meta_value;
+                        break;
+                    case '_length':
+                        $products[$product_count - 1]->length = $product_row->meta_value;
+                        break;
+                    case '_width':
+                        $products[$product_count - 1]->width = $product_row->meta_value;
+                        break;
+                    case '_height':
+                        $products[$product_count - 1]->height = $product_row->meta_value;
+                        break;
+                    case '_sku':
+                        $products[$product_count - 1]->sku = $product_row->meta_value;
+                        break;
+                    case '_sale_price_dates_from':
+                        $current_product_sale_start = $product_row->meta_value;
+                        break;
+                    case '_sale_price_dates_to':
+                        $start_time = strtotime($current_product_sale_start);
+                        $end_time = strtotime($product_row->meta_value);
+                        $now = strtotime('now');
+                        $products[$product_count - 1]->on_sale = ($now >= $start_time && $now <= $end_time);
+                        break;
+                    case '_thumbnail_id':
+                        $products[$product_count - 1]->images = $product_row->meta_value;
+                        break;
+                }
             }
+            unset($product_row);
+
+            foreach($products as $product) {
+                //Add categories
+                $query = "select name from wp_terms, wp_term_taxonomy, wp_term_relationships where object_id=%d AND wp_term_relationships.term_taxonomy_id=wp_term_taxonomy.term_taxonomy_id AND taxonomy='product_cat' AND wp_term_taxonomy.term_id = wp_terms.term_id;";
+                $query = $wpdb->prepare($query, $product->id);
+                $category_set = $wpdb->get_results($query);
+                $product->categories = array();
+                foreach($category_set as $category) {
+                    $product->categories[] = $category->name;
+                }
+                unset($category);
+
+                //Add images
+                $image_id = $product->images;
+                $product->images = array();
+                $query = "select meta_value as file_name from wp_postmeta where post_id=%d and meta_key='_wp_attached_file';";
+                $query = $wpdb->prepare($query, $image_id);
+                $images_set = $wpdb->get_results($query);
+                foreach ($images_set as $file_name) {
+                    $product->images[] = get_site_url() . "/wp-content/uploads/" . $file_name->file_name;
+                }
+                unset($file_name);
+            }
+            unset($product);
+
+            return $products;
         }
     }
 }
-
 
 global $woomiowoocommerce;
 if (!$woomiowoocommerce) {

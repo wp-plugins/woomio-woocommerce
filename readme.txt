@@ -1,10 +1,11 @@
-﻿=== Woomio for Shops ===
+﻿=== Woomio ===
 Contributors: Woomio Team
-Tags: woomio woocommerce,woocommerce,social media,share buys
+Tags: woomio,social media,share buys
 Requires at least: 3.0.1
 Tested up to: 3.4
-Stable tag: 4.3License: GPLv2 or laterLicense 
-URI: http://www.gnu.org/licenses/gpl-2.0.html
+Stable tag: trunk
+License: GPLv2 or later
+License URI: http://www.gnu.org/licenses/gpl-2.0.html
 
 == Description ==
 Woomio enables your customers to share their purchases - your products - on social media, in return of a discrete commission for every purchase generated. 
@@ -48,3 +49,8 @@ Don’t hesitate to email us on developer@woomio.com
 == Screenshots ==
 
 == Changelog ==
+
+= 1.1.4 =
+* Removed shipping from total price sent to Woomio
+
+== Arbitrary section ==
