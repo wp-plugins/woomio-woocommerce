@@ -3,7 +3,7 @@
 	Plugin Name: Woomio Woocommerce
 	Plugin URI: https://woomio.com
 	Description: Woomio Integration into WooCommerce made easy
-	Version: 1.1.4
+	Version: 1.1.5
 	Author: Woomio.com
 	Author URI: https://woomio.com
 */
@@ -16,7 +16,7 @@ if (!defined('ABSPATH') || !function_exists('is_admin')) {
 
 if (!class_exists("Woomio_Woocommerce")) {
 	class Woomio_Woocommerce {
-        const WOOMIO_WOOCOMMERCE_VERSION = '1.1.4';
+        const WOOMIO_WOOCOMMERCE_VERSION = '1.1.5';
         const WOOMIO_WOOCOMMERCE_RELEASE = '1430431200';
         const WOOMIO_WOOCOMMERCE_URL = 'https://www.woomio.com';
         const WOOMIO_WOOCOMMERCE_LINK = 'Woomio.com';
@@ -232,7 +232,9 @@ if (!class_exists("Woomio_Woocommerce")) {
             return true;
         }
 
-        // {base_url}/?woomio=orders&hrs=all&affiliated=false
+        /** 
+         * @param url: {base_url}/?woomio=orders&hrs=all&affiliated=false
+         */
         function getData($type) {
             $AllowedIP = gethostbyname(self::WOOMIO_WOOCOMMERCE_ACCESS);
             
@@ -712,6 +714,9 @@ if (!class_exists("Woomio_Woocommerce")) {
                         break;
                     case '_virtual':
                         $products[$product_count - 1]->virtual = $product_row->meta_value;
+                        break;
+                    case '_price':
+                        $products[$product_count - 1]->price = $product_row->meta_value;
                         break;
                     case '_regular_price':
                         $products[$product_count - 1]->regular_price = $product_row->meta_value;
