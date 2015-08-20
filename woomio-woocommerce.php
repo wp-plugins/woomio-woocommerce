@@ -3,7 +3,7 @@
 	Plugin Name: Woomio Woocommerce
 	Plugin URI: https://woomio.com
 	Description: Woomio Integration into WooCommerce made easy
-	Version: 1.1.5
+	Version: 1.1.6
 	Author: Woomio.com
 	Author URI: https://woomio.com
 */
@@ -16,7 +16,7 @@ if (!defined('ABSPATH') || !function_exists('is_admin')) {
 
 if (!class_exists("Woomio_Woocommerce")) {
 	class Woomio_Woocommerce {
-        const WOOMIO_WOOCOMMERCE_VERSION = '1.1.5';
+        const WOOMIO_WOOCOMMERCE_VERSION = '1.1.6';
         const WOOMIO_WOOCOMMERCE_RELEASE = '1430431200';
         const WOOMIO_WOOCOMMERCE_URL = 'https://www.woomio.com';
         const WOOMIO_WOOCOMMERCE_LINK = 'Woomio.com';
@@ -110,7 +110,7 @@ if (!class_exists("Woomio_Woocommerce")) {
             }
                     
 ?>
-<script type="text/javascript" src="https://woomio.com/assets/js/analytics/r.js" id="wa" data-r="<?=$WOOMIO_WOOCOMMERCE_RID?>" data-v="<?=self::WOOMIO_WOOCOMMERCE_VERSION?>"></script>
+<script type="text/javascript" src="https://www.woomio.com/assets/js/analytics/r.js" id="wa" data-r="<?=$WOOMIO_WOOCOMMERCE_RID?>" data-v="<?=self::WOOMIO_WOOCOMMERCE_VERSION?>"></script>
 <?php
         }
 
@@ -760,7 +760,7 @@ if (!class_exists("Woomio_Woocommerce")) {
 
             foreach($products as $product) {
                 //Add categories
-                $query = "select name from wp_terms, wp_term_taxonomy, wp_term_relationships where object_id=%d AND wp_term_relationships.term_taxonomy_id=wp_term_taxonomy.term_taxonomy_id AND taxonomy='product_cat' AND wp_term_taxonomy.term_id = wp_terms.term_id;";
+                $query = "select name from wp_terms, wp_term_taxonomy, wp_term_relationships where object_id=%d AND wp_term_relationships.term_taxonomy_id=wp_term_taxonomy.term_taxonomy_id AND wp_term_taxonomy.term_id = wp_terms.term_id;";
                 $query = $wpdb->prepare($query, $product->id);
                 $category_set = $wpdb->get_results($query);
                 $product->categories = array();
@@ -770,15 +770,17 @@ if (!class_exists("Woomio_Woocommerce")) {
                 unset($category);
 
                 //Add images
-                $image_id = $product->images;
+                //$image_id = $product->images;
                 $product->images = array();
-                $query = "select meta_value as file_name from wp_postmeta where post_id=%d and meta_key='_wp_attached_file';";
-                $query = $wpdb->prepare($query, $image_id);
+                //$query = "select meta_value as file_name from wp_postmeta where post_id=%d and meta_key='_thumbnail_id';";
+                $query = "select wp_posts.guid from wp_postmeta, wp_posts where wp_postmeta.post_id=%d and wp_postmeta.meta_key='_thumbnail_id' and wp_posts.ID=wp_postmeta.meta_value and wp_posts.post_type='attachment';";
+                $query = $wpdb->prepare($query, $product->id);
                 $images_set = $wpdb->get_results($query);
-                foreach ($images_set as $file_name) {
-                    $product->images[] = get_site_url() . "/wp-content/uploads/" . $file_name->file_name;
+                foreach ($images_set as $image) {
+                    //$product->images[] = get_site_url() . "/wp-content/uploads/" . $file_name->file_name;
+                    $product->images[] = $image->guid;
                 }
-                unset($file_name);
+                unset($image);
             }
             unset($product);
 

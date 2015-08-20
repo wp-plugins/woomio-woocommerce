@@ -2,7 +2,7 @@
 Contributors: Woomio Team
 Tags: woomio,social media,share buys
 Requires at least: 3.0.1
-Tested up to: 4.2.4
+Tested up to: 4.3.0
 Stable tag: trunk
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -49,6 +49,9 @@ Don’t hesitate to email us on developer@woomio.com
 == Screenshots ==
 
 == Changelog ==
+
+= 1.1.6 =
+* Improved image and category retrieval for products
 
 = 1.1.5 =
 * Fixed issue with product prices sent to Woomio
