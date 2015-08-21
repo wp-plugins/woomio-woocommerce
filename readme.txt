@@ -50,6 +50,9 @@ Don’t hesitate to email us on developer@woomio.com
 
 == Changelog ==
 
+= 1.1.7 =
+* Fixed bug in image and category fetching
+
 = 1.1.6 =
 * Improved image and category retrieval for products
 

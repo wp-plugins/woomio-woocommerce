@@ -3,7 +3,7 @@
 	Plugin Name: Woomio Woocommerce
 	Plugin URI: https://woomio.com
 	Description: Woomio Integration into WooCommerce made easy
-	Version: 1.1.6
+	Version: 1.1.7
 	Author: Woomio.com
 	Author URI: https://woomio.com
 */
@@ -758,9 +758,12 @@ if (!class_exists("Woomio_Woocommerce")) {
             }
             unset($product_row);
 
+            $terms_table = $wpdb->prefix . 'terms';
+            $term_taxonomy_table = $wpdb->prefix . 'term_taxonomy';
+            $term_relationships_table = $wpdb->prefix . 'term_relationships';
             foreach($products as $product) {
                 //Add categories
-                $query = "select name from wp_terms, wp_term_taxonomy, wp_term_relationships where object_id=%d AND wp_term_relationships.term_taxonomy_id=wp_term_taxonomy.term_taxonomy_id AND wp_term_taxonomy.term_id = wp_terms.term_id;";
+                $query = "select name from " . $terms_table . ", " . $term_taxonomy_table . ", " . $term_relationships_table . " where object_id=%d AND " . $term_relationships_table . ".term_taxonomy_id=" . $term_taxonomy_table . ".term_taxonomy_id AND " . $term_taxonomy_table . ".term_id = " . $terms_table . ".term_id;";
                 $query = $wpdb->prepare($query, $product->id);
                 $category_set = $wpdb->get_results($query);
                 $product->categories = array();
@@ -770,17 +773,32 @@ if (!class_exists("Woomio_Woocommerce")) {
                 unset($category);
 
                 //Add images
-                //$image_id = $product->images;
                 $product->images = array();
-                //$query = "select meta_value as file_name from wp_postmeta where post_id=%d and meta_key='_thumbnail_id';";
-                $query = "select wp_posts.guid from wp_postmeta, wp_posts where wp_postmeta.post_id=%d and wp_postmeta.meta_key='_thumbnail_id' and wp_posts.ID=wp_postmeta.meta_value and wp_posts.post_type='attachment';";
+                $query = "select " . $table_posts . ".guid from " . $table_postmeta . ", " . $table_posts . " where " . $table_postmeta . ".post_id=%d and " . $table_postmeta . ".meta_key='_thumbnail_id' and " . $table_posts . ".ID=" . $table_postmeta . ".meta_value and " . $table_posts . ".post_type='attachment';";
                 $query = $wpdb->prepare($query, $product->id);
                 $images_set = $wpdb->get_results($query);
                 foreach ($images_set as $image) {
-                    //$product->images[] = get_site_url() . "/wp-content/uploads/" . $file_name->file_name;
                     $product->images[] = $image->guid;
                 }
                 unset($image);
+                //Check if the product had no thumbnail images
+                if(count($product->images) <= 0) {
+                    $query = "select meta_value as images from " . $table_postmeta . " where post_id=%d and meta_key='_product_image_gallery';";
+                    $query = $wpdb->prepare($query, $product->id);
+                    $gallery = $wpdb->get_results($query);
+                    $images_string = "";
+                    foreach ($gallery as $row) {
+                        $images_string = $row->images;
+                    }
+                    unset($row);
+                    //We can skip parameter sanitation because the $images string comes directly from the db an external entry point
+                    $query = "select guid from " . $table_posts . " where " . $table_posts . ".ID IN (" . $images_string . ") and " . $table_posts . ".post_type='attachment';";
+                    $images_set = $wpdb->get_results($query);
+                    foreach ($images_set as $image) {
+                        $product->images[] = $image->guid;
+                    }
+                    unset($image);
+                }
             }
             unset($product);
 
