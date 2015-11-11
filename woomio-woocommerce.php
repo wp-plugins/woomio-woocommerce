@@ -3,7 +3,7 @@
 	Plugin Name: Woomio Woocommerce
 	Plugin URI: https://woomio.com
 	Description: Woomio Integration into WooCommerce made easy
-	Version: 1.1.7
+	Version: 1.1.9
 	Author: Woomio.com
 	Author URI: https://woomio.com
 */
@@ -16,12 +16,12 @@ if (!defined('ABSPATH') || !function_exists('is_admin')) {
 
 if (!class_exists("Woomio_Woocommerce")) {
 	class Woomio_Woocommerce {
-        const WOOMIO_WOOCOMMERCE_VERSION = '1.1.6';
+        const WOOMIO_WOOCOMMERCE_VERSION = '1.1.9';
         const WOOMIO_WOOCOMMERCE_RELEASE = '1430431200';
-        const WOOMIO_WOOCOMMERCE_URL = 'https://www.woomio.com';
         const WOOMIO_WOOCOMMERCE_LINK = 'Woomio.com';
 
         const WOOMIO_WOOCOMMERCE_ACCESS = 'ping.woomio.com';
+        //const WOOMIO_WOOCOMMERCE_API = 'http://test.woomio.com/';
         const WOOMIO_WOOCOMMERCE_API = 'https://www.woomio.com/';        
         
         public $WOOMIO_WOOCOMMERCE_RID = 0;
@@ -47,7 +47,6 @@ if (!class_exists("Woomio_Woocommerce")) {
             register_activation_hook(__FILE__, array($this, 'activate'));
             register_deactivation_hook(__FILE__, array($this, 'deactivate'));
         }
-
 
         function activate($networkwide) {
             $this->network_propagate(array($this, '_activate'), $networkwide);
@@ -78,8 +77,7 @@ if (!class_exists("Woomio_Woocommerce")) {
 
         function _activate() {
             $this->installDB();
-            $Response = $this->registerSite();
-            update_option('woomio_rid', $Response);
+            $this->registerSite();
         }
 
 
@@ -99,6 +97,7 @@ if (!class_exists("Woomio_Woocommerce")) {
             }
 
             add_action('woocommerce_thankyou', array($this, 'registerOrder'));
+            add_action('woocommerce_order_status_completed', array($this, 'orderComplete'));
         }
 
         function add_woomio_script() {
@@ -134,7 +133,7 @@ if (!class_exists("Woomio_Woocommerce")) {
 
 
         function registerSite() {
-            $url = self::WOOMIO_WOOCOMMERCE_API . 'umbraco/api/Endpoints/RetailerSignup?name=%s&domain=%s&country=%s&email=%s&platform=3';
+            $url = self::WOOMIO_WOOCOMMERCE_API . 'umbraco/api/Endpoints/RetailerSignupAuthenticated?name=%s&domain=%s&country=%s&email=%s&platform=3';
             $name = urlencode(get_bloginfo('name'));
             $domain = urlencode(get_bloginfo('url'));
             $lang = urlencode(substr(get_bloginfo('language'), 0, 2));
@@ -150,12 +149,18 @@ if (!class_exists("Woomio_Woocommerce")) {
             $Response = @file_get_contents($callBack, false, $context);
             restore_error_handler();
 
-            return $Response;
+            $Response = json_decode($Response);
+
+            update_option('woomio_rid', $Response->retailerid);
+            update_option('woomio_token', $Response->token);
+            update_option('woomio_iid', $Response->installid);
+
+            $this->remote_log('Activated plugin.', $Response->token);
         }
 
 
         function registerOrder($order_id) {
-            $order = new WC_Order($order_id);
+            //Store cookie and order id in db
             $wacsid = null;
             if(isset($_COOKIE['wacsid'])) {
                 $wacsid = $_COOKIE['wacsid'];
@@ -177,6 +182,16 @@ if (!class_exists("Woomio_Woocommerce")) {
 				array('%d','%d')
             );
 
+            return true;
+        }
+
+        function orderComplete($order_id) {
+            global $wpdb;
+
+            $order = new WC_Order($order_id);
+
+            $wacsid = $wpdb->get_var("SELECT wacsid FROM " . $wpdb->prefix . "woomio_woocommerce WHERE orderid='" . $order_id . "'");
+
             //The following should be optimized instead of building a URL and then splitting it up again.
             $sid = urlencode($wacsid);
             $oid = urlencode($order_id);
@@ -185,7 +200,7 @@ if (!class_exists("Woomio_Woocommerce")) {
             $email = urlencode($order->billing_email);
             $url = urlencode($_SERVER['SERVER_NAME']);
 
-            $purchase_url = "https://www.woomio.com/endpoints/purchase?sid=" . $sid . "&oid=" . $oid . "&ot=" . $ot . "&oc=" . $oc . "&email=" . $email . "&url=" . $url;
+            $purchase_url = self::WOOMIO_WOOCOMMERCE_API . "api/endpoints/purchase?sid=" . $sid . "&oid=" . $oid . "&ot=" . $ot . "&oc=" . $oc . "&email=" . $email . "&url=" . $url;
 
             //Ignore errors returned by the server
             $context = stream_context_create(array(
@@ -199,37 +214,47 @@ if (!class_exists("Woomio_Woocommerce")) {
             @file_get_contents($purchase_url, false, $context);
             restore_error_handler();
 
-            //TODO: Figure out how to make fsockopen stable, since it is a faster connection.
-            /*$parts = parse_url($purchase_url);
+            return true;
+        }
 
-            $host = $parts['host'];
-
-            $path = $parts['path'];
-            if($parts['query'] != "") {
-                $path .= "?" . $parts['query'];
+        function remote_log($message, $token = NULL) {
+            global $wpdb;
+            
+            //If no token is passed fetch from db
+            if($token == NULL) {
+                $token = get_option('woomio_token');
             }
+
+            //Send log, if token expired that is access denied, request new token with install id from db
+            $url = self::WOOMIO_WOOCOMMERCE_API . "api/pluginlogger/remotelog";
+            $opts = array(
+                'http' => array(
+                    'header' => "Content-type: application/json\r\n" . "Authorization: Bearer " . $token . "\r\n",
+                    'method' => 'POST',
+                    'content' => '{"log":"' . $message . '"}',
+                    'timeout' => 2 //seconds
+                )
+            );
+            $context = stream_context_create($opts);
 
             set_error_handler(array('Woomio_Woocommerce', 'w_error_handler'));
-            $file_pointer = fsockopen("ssl://" . $host, 443, $errno, $errstr, 10);
+            $result = @file_get_contents($url, false, $context);
             restore_error_handler();
 
-            if(!$file_pointer) {
-                error_log("Error opening socket to woomio server: " . $errstr .  "(" . $errno . ").", 0);
+            if($result !== false) {
+                //Log successful
+                return;
             }
-            else {
-                $out = "GET " . $path . " HTTP/1.1\r\n";
-                $out .= "Host: " . $host . "\r\n";
-                $out .= "Connection: Close\r\n\r\n";
-                $fwrite = fwrite($file_pointer, $out);
-                stream_set_timeout($file_pointer, 2);
 
-                if($fwrite === false) {
-                    error_log("Error sending request to woomio server: Error writing to socket.", 0);
-                }
-                fclose($file_pointer);
-            }*/
+            //error_log('LOG FAILED retry!');
 
-            return true;
+            //TODO: This part would only be relevant for when we decide to log other events than installation
+
+            //Request a new token
+
+            //Store new token
+
+            //Recall this function with an increment on the log_attempt_counter (counter needed to avoid infinite recursion)
         }
 
         /** 
@@ -281,7 +306,7 @@ if (!class_exists("Woomio_Woocommerce")) {
             $table_woomio = $wpdb->prefix . "woomio_woocommerce";
             $now = new DateTime(null, new DateTimeZone('UTC'));
 
-            $query = "SELECT DISTINCT " . $table_order_items . ".order_id, post_date_gmt, order_item_name, order_item_type, " . $table_order_items . ".order_item_id, meta_key, meta_value";
+            $query = "SELECT DISTINCT " . $table_order_items . ".order_id, post_date_gmt, post_status, order_item_name, order_item_type, " . $table_order_items . ".order_item_id, meta_key, meta_value";
             if($affiliated === true) {
                 $query .= ", wacsid";
             }
@@ -324,6 +349,7 @@ if (!class_exists("Woomio_Woocommerce")) {
                     $orders[$order_count] = new stdClass();
                     $orders[$order_count]->id = $order_row->order_id;
                     $orders[$order_count]->time = $order_row->post_date_gmt;
+                    $orders[$order_count]->status = $order_row->post_status;
                     $orders[$order_count]->items = array();
                     $orders[$order_count]->shippings = array();
                     $current_order_id = $order_row->order_id;
@@ -707,7 +733,7 @@ if (!class_exists("Woomio_Woocommerce")) {
                         $products[$product_count - 1]->stock_status = $product_row->meta_value;
                         break;
                     case 'total_sales':
-                        $products[$product_count - 1]->stock_status = $product_row->meta_value;
+                        $products[$product_count - 1]->total_sales = $product_row->meta_value;
                         break;
                     case '_downloadable':
                         $products[$product_count - 1]->downloadable = $product_row->meta_value;

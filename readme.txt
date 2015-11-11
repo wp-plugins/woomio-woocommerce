@@ -1,8 +1,8 @@
-﻿=== Woomio ===
+﻿=== Woomio for WooCommerce ===
 Contributors: Woomio Team
 Tags: woomio,social media,share buys
 Requires at least: 3.0.1
-Tested up to: 4.3.0
+Tested up to: 4.3.1
 Stable tag: trunk
 License: GPLv2 or later
 License URI: http://www.gnu.org/licenses/gpl-2.0.html
@@ -49,6 +49,12 @@ Don’t hesitate to email us on developer@woomio.com
 == Screenshots ==
 
 == Changelog ==
+
+= 1.1.9 =
+* Updated data retrieval and logging
+
+= 1.1.8 =
+* Added status to order retrieval
 
 = 1.1.7 =
 * Fixed bug in image and category fetching
